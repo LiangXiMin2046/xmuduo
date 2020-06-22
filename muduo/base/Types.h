@@ -17,7 +17,7 @@ typedef __gnu_cxx::__sso_string string;
 #endif
 
 template<typename To,typename From>
-inline To implicit_cast(const &F){
+inline To implicit_cast(const From &F){
 	return F;
 }
 
