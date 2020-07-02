@@ -1,7 +1,7 @@
-#include "/muduoday/day6/muduo/base/Thread.h"
-#include "/muduoday/day6/muduo/base/BoundedBlockingQueue.h"
-#include "/muduoday/day6/muduo/base/CurrentThread.h"
-#include "/muduoday/day6/muduo/base/CountDownLatch.h"
+#include "/xmuduo/muduo/base/Thread.h"
+#include "/xmuduo/muduo/base/BoundedBlockingQueue.h"
+#include "/xmuduo/muduo/base/CurrentThread.h"
+#include "/xmuduo/muduo/base/CountDownLatch.h"
 
 #include <boost/ptr_container/ptr_vector.hpp>
 #include<boost/bind.hpp>
