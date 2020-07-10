@@ -2,7 +2,7 @@
 #define _MUDUO_BASE_EXCEPTION_H
 
 #include<exception>
-#include "xmuduo/muduo/base/Types.h"
+#include "/xmuduo/muduo/base/Types.h"
 
 namespace muduo{
 class Exception : public std::exception{
