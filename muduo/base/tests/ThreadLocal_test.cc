@@ -1,6 +1,6 @@
 #include "/xmuduo/muduo/base/ThreadLocal.h"
 #include "/xmuduo/muduo/base/CurrentThread.h"
-#include "/xmudduo/muduo/base/Thread.h"
+#include "/xmuduo/muduo/base/Thread.h"
 
 #include<unistd.h>
 #include<string>
