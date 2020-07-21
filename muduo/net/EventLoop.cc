@@ -2,6 +2,7 @@
 #include "/xmuduo/muduo/base/Logging.h"
 #include "/xmuduo/muduo/net/Poller.h"
 #include "/xmuduo/muduo/net/Channel.h"
+#include "/xmuduo/muduo/net/TimerQueue.h"
 
 //#include <poll.h>
 
@@ -27,6 +28,7 @@ EventLoop::EventLoop()
 		eventHandling_(false),
 		poller_(Poller::newDefaultPoller(this)),
 		threadId_(CurrentThread::tid()),
+		timerQueue_(new TimerQueue(this)),
 		currentActiveChannel_(NULL)
 {
 	LOG_TRACE<< "EventLoop created" << this << "in thread" << threadId_;
@@ -86,6 +88,28 @@ void EventLoop::quit()
 	}
 }
 
+TimerId EventLoop::runAt(const Timestamp& time,const TimerCallback& cb)
+{
+	return timerQueue_ -> addTimer(cb,time,0.0);
+}
+
+TimerId EventLoop::runAfter(double delay,const TimerCallback& cb)
+{
+	Timestamp time(addTime(Timestamp::now(),delay));
+	return runAt(time,cb);
+}
+
+TimerId EventLoop::runEvery(double interval,const TimerCallback& cb)
+{
+	Timestamp time(addTime(Timestamp::now(),interval));
+	return timerQueue_ -> addTimer(cb,time,interval);
+}
+
+void EventLoop::cancel(TimerId timerId)
+{
+	return timerQueue_ ->cancel(timerId);
+}
+
 void EventLoop::updateChannel(Channel* channel)
 {
 	assert(channel->ownerLoop() == this);
@@ -117,6 +141,6 @@ void EventLoop::printActiveChannels() const
 			it != activeChannels_.end(); ++it)
 	{
 		const Channel* ch = *it;
-		LOG_TRACE << "{" << ch -> reventsToString() << "} ";
+		LOG_TRACE << "{ " << ch -> reventsToString() << " } ";
 	}
 }
