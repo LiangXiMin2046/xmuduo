@@ -102,13 +102,17 @@ TimerId TimerQueue::addTimer(const TimerCallback& cb,
 							double interval)
 {
 	Timer* timer = new Timer(cb,when,interval);
-	addTimerInLoop(timer);
+	loop_ -> runInLoop(
+				boost::bind(&TimerQueue::addTimerInLoop,this,timer));
+   	//addTimerInLoop(timer);
 	return TimerId(timer,timer->sequence());
 }
 
 void TimerQueue::cancel(TimerId timerId)
 {
-	cancelInLoop(timerId);
+	loop_ -> runInLoop(
+				boost::bind(&TimerQueue::cancelInLoop,this,timerId));
+	//cancelInLoop(timerId);
 }
 
 void TimerQueue::addTimerInLoop(Timer* timer)

@@ -6,6 +6,9 @@
 
 //#include <poll.h>
 
+#include <boost/bind.hpp>
+#include <sys/eventfd.h>
+
 using namespace muduo;
 using namespace muduo::net;
 
@@ -14,6 +17,17 @@ namespace
 __thread EventLoop* t_loopInThisThread = 0;
 
 const int kPollTimeMs = 10000;
+}
+
+int createEventfd()
+{
+	int evtfd = ::eventfd(0,EFD_NONBLOCK | EFD_CLOEXEC);
+	if(evtfd < 0)
+	{
+		LOG_SYSERR << "Failed in eventfd";
+		abort();
+	}
+	return evtfd;
 }
 
 EventLoop* EventLoop::getEventLoopOfCurrentThread()
@@ -29,6 +43,8 @@ EventLoop::EventLoop()
 		poller_(Poller::newDefaultPoller(this)),
 		threadId_(CurrentThread::tid()),
 		timerQueue_(new TimerQueue(this)),
+		wakeupFd_(createEventfd()),
+		wakeupChannel_(new Channel(this,wakeupFd_)),
 		currentActiveChannel_(NULL)
 {
 	LOG_TRACE<< "EventLoop created" << this << "in thread" << threadId_;
@@ -41,6 +57,8 @@ EventLoop::EventLoop()
 	{
 		t_loopInThisThread = this;
 	}
+	wakeupChannel_ -> setReadCallback(boost::bind(&EventLoop::handleRead,this));
+	wakeupChannel_ -> enableReading();
 }
 
 EventLoop::~EventLoop()
@@ -74,6 +92,7 @@ void EventLoop::loop()
 		}
 		currentActiveChannel_ = NULL;
 		eventHandling_ = false;
+		doPendingFunctors();
 	}	
 	LOG_TRACE << "EventLoop" << this << "stop looping";
 	looping_ = false;
@@ -84,10 +103,33 @@ void EventLoop::quit()
 	quit_ = true;
 	if(!isInLoopThread())
 	{
-		
+		wakeup();		
 	}
 }
 
+void EventLoop::runInLoop(const Functor& cb)
+{
+	if(isInLoopThread())
+	{
+		cb();
+	}
+	else
+	{
+		queueInLoop(cb);
+	}
+}
+
+void EventLoop::queueInLoop(const Functor& cb)
+{
+	{
+		MutexLockGuard lock(mutex_);
+		pendingFunctors_.push_back(cb);
+	}
+	if(!isInLoopThread() || callingPendingFunctors_)
+	{
+		wakeup();
+	}
+}
 TimerId EventLoop::runAt(const Timestamp& time,const TimerCallback& cb)
 {
 	return timerQueue_ -> addTimer(cb,time,0.0);
@@ -129,10 +171,47 @@ void EventLoop::removeChannel(Channel* channel)
 	}
 	poller_ -> removeChannel(channel);
 }
+
 void EventLoop::abortNotInLoopThread()
 {
 	LOG_FATAL << "EventLoop::abortNotIntLoopThread-EventLoop"<<this<<" was created in threadId_ = " << threadId_
 				<< ",current thread id = " << CurrentThread::tid();
+}
+
+void EventLoop::wakeup()
+{
+	uint64_t one = 1;
+	//ssize_t n = sockets::write(wakeupFd_,&one,sizeof one);
+	ssize_t n = ::write(wakeupFd_,&one,sizeof one);
+	if(n != sizeof one)
+	{
+		LOG_ERROR << "EventLoop::wakeup() writes " << n << "bytes instead of 8";
+	}
+}
+
+void EventLoop::handleRead()
+{
+	uint64_t one = 1;
+	ssize_t n = ::read(wakeupFd_,&one,sizeof one);
+	if(n != sizeof one)
+	{
+		LOG_ERROR << "EventLoop::wakeup() reads " << n << "bytes instead of 8";
+	}
+}
+
+void EventLoop::doPendingFunctors()
+{
+	std::vector<Functor> functors;
+	callingPendingFunctors_ = true;
+	{
+		MutexLockGuard lock(mutex_);
+		functors.swap(pendingFunctors_);
+	}
+	for(size_t i = 0; i < functors.size(); ++i)
+	{
+		functors[i]();
+	}
+	callingPendingFunctors_ = false;
 }
 
 void EventLoop::printActiveChannels() const

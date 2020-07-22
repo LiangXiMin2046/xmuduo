@@ -5,7 +5,7 @@
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 
-#include "/xmuduo/muduo/base/CurrentThread.h"
+#include "/xmuduo/muduo/base/Mutex.h"
 #include "/xmuduo/muduo/base/Thread.h"
 #include "/xmuduo/muduo/base/Timestamp.h"
 #include "/xmuduo/muduo/net/Callbacks.h"
@@ -23,6 +23,7 @@ class TimerQueue;
 class EventLoop : boost::noncopyable
 {
 public:
+	typedef boost::function<void()> Functor;
 	EventLoop();
 	~EventLoop();
 	
@@ -32,6 +33,14 @@ public:
 	//Time when poll returns,usually means data arrival
 	//
 	Timestamp pollReturnTime() const {return pollReturnTime_;}
+
+	//
+	//wakes up loop and run the cb
+	//can be called in other thread
+	//
+	void runInLoop(const Functor& cb);
+	
+	void queueInLoop(const Functor& cb);
 	
 	TimerId runAt(const Timestamp& time,const TimerCallback& cb);
 
@@ -40,6 +49,7 @@ public:
 	TimerId runEvery(double interval,const TimerCallback& cb);
 
 	void cancel(TimerId timerId);
+	void wakeup();
 	void updateChannel(Channel* channel);
 	void removeChannel(Channel* channel);
 	void assertInLoopThread()
@@ -54,7 +64,8 @@ public:
 	static EventLoop* getEventLoopOfCurrentThread();
 private:
 	void abortNotInLoopThread();
-	
+	void handleRead(); //for wake up
+	void doPendingFunctors();
 	void printActiveChannels() const;
 	
 	typedef std::vector<Channel*>ChannelList;
@@ -62,12 +73,17 @@ private:
 	bool looping_;
 	bool quit_;
 	bool eventHandling_;
+	bool callingPendingFunctors_;
 	const pid_t threadId_;
 	Timestamp pollReturnTime_;
 	boost::scoped_ptr<Poller> poller_;
 	boost::scoped_ptr<TimerQueue> timerQueue_;
+	int wakeupFd_;
+	boost::scoped_ptr<Channel> wakeupChannel_;
 	ChannelList activeChannels_;
 	Channel* currentActiveChannel_;
+	MutexLock mutex_;
+	std::vector<Functor> pendingFunctors_;
 };
 
 }
