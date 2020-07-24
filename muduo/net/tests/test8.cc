@@ -10,7 +10,7 @@
 using namespace muduo;
 using namespace muduo::net;
 
-void newConnection(int sockfd,const InetAddress& addr)
+void newConnection1(int sockfd,const InetAddress& addr)
 {
 	//printf("%d\n",sockfd);
 	printf("ip and port of new connection : %s\n",addr.toIpPort().c_str());
@@ -20,6 +20,13 @@ void newConnection(int sockfd,const InetAddress& addr)
 	sockets::write(sockfd,buf,sizeof(buf));
 	//::write(sockfd,"hello",5);
 	sockets::close(sockfd);		
+}
+
+void newConnection2(int sockfd,const InetAddress& addr)
+{
+	printf("ip and port of new connection : %s\n",addr.toIpPort().c_str());
+	sockets::write(sockfd,"have a day today\n",17);
+	::sockets::close(sockfd);	
 }
 
 int main(void)
@@ -32,10 +39,10 @@ int main(void)
 	Acceptor acceptor1(&loop,addr1);
 	Acceptor acceptor2(&loop,addr2);
 
-	acceptor1.setNewConnectionCallback(newConnection);
+	acceptor1.setNewConnectionCallback(newConnection1);
 	acceptor1.listen();
 
-	acceptor2.setNewConnectionCallback(newConnection);
+	acceptor2.setNewConnectionCallback(newConnection2);
 	acceptor2.listen();
 	
 	loop.loop();
