@@ -44,7 +44,7 @@ class Channel : boost::noncopyable
 		void enableWriting() {events_ |= kWriteEvent; update();}
 		void disableReading() {events_ &= ~kReadEvent; update();}
 		void disableWriting() {events_ &= ~kWriteEvent; update();}
-		void disableAll() {events_ &= ~kNoneEvent; update();}
+		void disableAll() {events_ = kNoneEvent; update();}
 		bool isWriting() const {return events_ & kWriteEvent;}
 		
 		//for Poller
