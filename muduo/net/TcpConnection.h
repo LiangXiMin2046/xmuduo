@@ -42,16 +42,23 @@ public:
 	bool connected() const {return state_ == kConnected;}
 	
 	void setConnectionCallback(const ConnectionCallback& cb)
-	{ connectionCallback_ = cb; }
+	{  connectionCallback_ = cb;  }
 
 	void setMessageCallback(const MessageCallback& cb)
-	{ messageCallback_ = cb; }
-
+	{  messageCallback_ = cb;  }
+	
+	//Internal use only
+	void setCloseCallback(const CloseCallback& cb)
+	{  closeCallback_ = cb;  }
 	//called when TcpServer accepted a new connection
 	void connectEstablished();	
+	//called when TcpServer has removed TcpConnection from map
+	void connectDestroyed();
 private:
-	enum stateE {/*kDisConnected*/kConnecting,kConnected/*,kDisConnecting*/};
+	enum stateE {kDisconnected,kConnecting,kConnected,kDisConnecting};
 	void handleRead(Timestamp receiveTime);
+	void handleClose();
+	void handleError();
 	void setState(stateE s) { state_ = s; }	
 	
 	EventLoop* loop_;
@@ -63,6 +70,7 @@ private:
 	InetAddress peerAddr_;
 	ConnectionCallback connectionCallback_;
 	MessageCallback messageCallback_;
+	CloseCallback closeCallback_;
 };
 
 typedef boost::shared_ptr<TcpConnection> TcpConnectionPtr;
