@@ -12,11 +12,12 @@ class Server
 {
 public:
 	Server(EventLoop* loop,const InetAddress& listenAddr,
-			const string& nameArg)
+			const string& nameArg,int numThreads)
 	:	server_(loop,listenAddr,nameArg)
 	{
 		server_.setConnectionCallback(boost::bind(&Server::onConnection,this,_1));
 		server_.setMessageCallback(boost::bind(&Server::onMessage,this,_1,_2,_3));
+		server_.setThreadNum(numThreads);
 	}
 	
 	void start()
@@ -53,7 +54,7 @@ int main(void)
 {
 	EventLoop loop;
 	InetAddress addr(9527);
-	Server server(&loop,addr,"server");	
+	Server server(&loop,addr,"server",4);
 	server.start();
 	loop.loop();
 	return 0;
