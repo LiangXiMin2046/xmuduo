@@ -14,12 +14,13 @@ namespace net
 {
 class Acceptor;
 class EventLoop;
+class EventLoopThreadPool;
 
 //supports single-thread and thread pool model
 class TcpServer : boost::noncopyable
 {
 public:
-	//typedef boost::function<void(EventLoop*)> ThreadInitCallback;
+	typedef boost::function<void(EventLoop*)> ThreadInitCallback;
 	//TcpServer(EventLoop* loop,const InetAddress& listenAddr);
 	TcpServer(EventLoop* loop,const InetAddress& lostenAddr,
 			  const string& nameArg);
@@ -29,6 +30,10 @@ public:
 	const string& hostport() const {return hostport_;}
 	const string& name() const {return name_;}
  
+	//set number of threads
+	void setThreadNum(int numThreads);
+	void setThreadInitCallback(const ThreadInitCallback& cb)
+	{  threadInitCallback_ = cb;  }
 	//start the server
 	void start();
 
@@ -43,13 +48,16 @@ private:
 
 	void removeConnection(const TcpConnectionPtr& conn);
 	
+	void removeConnectionInLoop(const TcpConnectionPtr& conn);
 	typedef std::map<string,TcpConnectionPtr> ConnectionMap;
 	EventLoop* loop_;
 	const string hostport_;
 	const string name_;
 	boost::scoped_ptr<Acceptor> acceptor_;
+	boost::scoped_ptr<EventLoopThreadPool> threadPool_;
 	ConnectionCallback connectionCallback_;
 	MessageCallback messageCallback_;
+	ThreadInitCallback threadInitCallback_;
 	bool started_;
 	// in loop thread
 	int nextConnId_;
