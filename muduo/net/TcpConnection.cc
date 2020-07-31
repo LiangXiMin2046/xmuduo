@@ -14,15 +14,21 @@
 using namespace muduo;
 using namespace muduo::net;
 
-/*
-void muduo::net::defaultConnectionCallBack(const TcpConnectionPtr& conn);
-* /
 
-/*
-void muduo::net::defaultMessageCallBack(const TcpConnectionPtr&
+void muduo::net::defaultConnectionCallback(const TcpConnectionPtr& conn)
+{
+	LOG_TRACE << conn -> localAddress().toIpPort() << " -> "
+			  << conn -> peerAddress().toIpPort() << " is "
+			  << (conn -> connected() ? "UP" : "DOWN");
+}
+
+
+void muduo::net::defaultMessageCallback(const TcpConnectionPtr&,
 										Buffer* buf,
-										Timestamp);
-*/
+										Timestamp)
+{
+	buf -> retrieveAll();
+}
  
 TcpConnection::TcpConnection(EventLoop* loop,
 							 const string& nameArg,
@@ -59,6 +65,95 @@ TcpConnection::~TcpConnection()
 				<< " fd=" <<  channel_ -> fd();
 }
 
+//thread safe
+void TcpConnection::send(const void* data,size_t len)
+{
+	if(state_ == kConnected)
+	{
+		if(loop_ -> isInLoopThread())
+		{
+			sendInLoop(data,len);
+		}
+		else
+		{
+			string message(static_cast<const char*>(data),len);
+			loop_ -> runInLoop(boost::bind(&TcpConnection::sendInLoop,
+							  this,message));
+		}
+	}
+}
+
+void TcpConnection::send(const StringPiece& message)
+{
+	if(state_ == kConnected)
+	{
+		if(loop_ -> isInLoopThread())
+		{
+			sendInLoop(message);
+		}
+		else
+		{
+			loop_ -> runInLoop(boost::bind(&TcpConnection::sendInLoop,
+							  this,message.as_string()));
+		}
+	}
+}
+
+void TcpConnection::send(Buffer* buf)
+{
+	if(state_ == kConnected)
+	{
+		if(loop_ -> isInLoopThread())
+		{
+			sendInLoop(buf->peek(),buf->readableBytes());
+			buf -> retrieveAll();
+		}
+		else
+		{
+			loop_ -> runInLoop(boost::bind(&TcpConnection::sendInLoop,
+							  this,buf->retrieveAllAsString()));
+		}
+	}
+}
+
+void TcpConnection::sendInLoop(const StringPiece& message)
+{
+	sendInLoop(message.data(),message.size());
+}
+
+void TcpConnection::sendInLoop(const void* data,size_t len)
+{
+	loop_ -> assertInLoopThread();
+	sockets::write(channel_->fd(),data,len);
+	/*
+ *
+ *
+ * */
+}
+
+void TcpConnection::shutdown()
+{
+	if(state_ == kConnected)
+	{
+		setState(kDisConnecting);
+		loop_->runInLoop(boost::bind(&TcpConnection::shutdownInLoop,this));
+	}
+}
+
+void TcpConnection::shutdownInLoop()
+{
+	loop_->assertInLoopThread();
+	if(!channel_->isWriting())
+	{
+		socket_->shutdownWrite();
+	}
+}
+
+void TcpConnection::setTcpNoDelay(bool on)
+{
+	socket_ -> setTcpNoDelay(on);
+}
+
 void TcpConnection::connectEstablished()
 {
 	loop_ -> assertInLoopThread();
@@ -92,14 +187,14 @@ void TcpConnection::handleRead(Timestamp receiveTime)
 	/**/
 	loop_ -> assertInLoopThread();
 	int savedErrno = 0;
-	char buf[65535];
-	ssize_t n = ::read(channel_ -> fd(),buf,sizeof(buf));
+	ssize_t n = inputBuffer_.readFd(channel_->fd(),&savedErrno);
 	if(n > 0)
 	{
-		messageCallback_(shared_from_this(),buf,n);
+		messageCallback_(shared_from_this(),&inputBuffer_,receiveTime);
 	}
 	else if(n == 0)
 	{
+		LOG_TRACE << "hanle closing...";
 		handleClose();
 	}
 	else
