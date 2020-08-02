@@ -147,7 +147,7 @@ void sockets::close(int sockfd)
 {
 	if(::close(sockfd) < 0)
 	{
-		LOG_SYSERR << "sockets::close";
+		LOG_SYSERR << "sockets::close "<< sockfd;
 	}	
 }
 

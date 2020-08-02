@@ -41,16 +41,19 @@ TcpConnection::TcpConnection(EventLoop* loop,
 		socket_(new Socket(sockfd)),
 		channel_(new Channel(loop,sockfd)),
 		localAddr_(localAddr),
-		peerAddr_(peerAddr)/*,
-		highWaterMark_(64*1024*1024)*/
+		peerAddr_(peerAddr),
+		highWaterMark_(64*1024*1024)
 {
-	channel_ -> setReadCallback(
+	channel_ ->setReadCallback(
 		boost::bind(&TcpConnection::handleRead,this,_1));
-	
-	channel_ -> setCloseCallback(
+
+	channel_->setWriteCallback(
+		boost::bind(&TcpConnection::handleWrite,this));
+
+	channel_ ->setCloseCallback(
 		boost::bind(&TcpConnection::handleClose,this));
 
-	channel_ -> setErrorCallback(
+	channel_->setErrorCallback(
 		boost::bind(&TcpConnection::handleError,this));
 
 	LOG_DEBUG << "TcpConnection::ctor[" << name_ << "] at" << this 
@@ -123,19 +126,70 @@ void TcpConnection::sendInLoop(const StringPiece& message)
 
 void TcpConnection::sendInLoop(const void* data,size_t len)
 {
+	//loop_ -> assertInLoopThread();
+	//sockets::write(channel_->fd(),data,len);
 	loop_ -> assertInLoopThread();
-	sockets::write(channel_->fd(),data,len);
-	/*
- *
- *
- * */
+	ssize_t nwrote = 0;
+	size_t remaining = len;
+	bool error = false;
+	if(state_ == kDisconnected)
+	{
+		LOG_WARN << "disconnected, give ip writing";
+		return;
+	}
+
+	//if no thing in output queue,try writing directly
+	if(!channel_->isWriting() && outputBuffer_.readableBytes() == 0)
+	{
+		nwrote = sockets::write(channel_->fd(),data,len);
+		if(nwrote >= 0)
+		{
+			remaining = len - nwrote;
+			//remainging == 0 means write completly
+			if(remaining == 0 && writeCompleteCallback_)
+			{
+				loop_->queueInLoop(boost::bind(writeCompleteCallback_,shared_from_this()));
+			}
+		}
+		else //error happens
+		{
+			nwrote = 0;
+			if(errno != EWOULDBLOCK)
+			{
+				LOG_SYSERR << "TcpConnection::senInLoop";
+				if(errno == EPIPE)
+				{
+					error = true;
+				}
+			}
+		}
+	}
+	assert(remaining <= len);
+	//no error and remaining data should be written to buffer
+	if(!error && remaining > 0)	
+	{
+		LOG_TRACE << "going to write more data";
+		size_t oldLen = outputBuffer_.readableBytes();
+		//highWaterMarkCallback will be called when data in buffer over highwatermark
+		if(oldLen + remaining >= highWaterMark_
+		   && oldLen < highWaterMark_
+		   && highWaterMarkCallback_)
+		{
+			loop_->queueInLoop(boost::bind(highWaterMarkCallback_,shared_from_this(),oldLen + remaining));
+		} 
+		outputBuffer_.append(static_cast<const char*>(data)+nwrote,remaining);
+		if(!channel_->isWriting())
+		{
+			channel_->enableWriting();
+		}
+	}
 }
 
 void TcpConnection::shutdown()
 {
 	if(state_ == kConnected)
 	{
-		setState(kDisConnecting);
+		setState(kDisconnecting);
 		loop_->runInLoop(boost::bind(&TcpConnection::shutdownInLoop,this));
 	}
 }
@@ -194,7 +248,6 @@ void TcpConnection::handleRead(Timestamp receiveTime)
 	}
 	else if(n == 0)
 	{
-		LOG_TRACE << "hanle closing...";
 		handleClose();
 	}
 	else
@@ -205,11 +258,51 @@ void TcpConnection::handleRead(Timestamp receiveTime)
 	}
 }
 
+void TcpConnection::handleWrite()
+{
+	loop_->assertInLoopThread();
+	if(channel_->isWriting())
+	{
+		ssize_t n = sockets::write(channel_->fd(),
+					outputBuffer_.peek(),
+					outputBuffer_.readableBytes());
+		if(n > 0)
+		{
+			outputBuffer_.retrieve(n);
+			if(outputBuffer_.readableBytes() == 0)
+			{
+				channel_->disableWriting();
+				if(writeCompleteCallback_)
+				{
+					loop_->queueInLoop(boost::bind(writeCompleteCallback_,shared_from_this()));
+				}
+				if(state_ == kDisconnecting)
+				{
+					shutdownInLoop();
+				}
+			}
+			else
+			{
+				LOG_TRACE << "going to write more data";
+			}
+		}
+		else
+		{
+			LOG_SYSERR << "TcpConnection::handleWrite";
+		}
+	}
+	else
+	{
+		LOG_TRACE << "connection fd = " << channel_->fd()
+					<< "is down,no more writing";
+	}
+}
+
 void TcpConnection::handleClose()
 {
 	loop_ -> assertInLoopThread();
 	LOG_TRACE << "fd = " << channel_ -> fd() << "state = " << state_;
-	assert(state_ == kConnected || state_ == kDisConnecting);
+	assert(state_ == kConnected || state_ == kDisconnecting);
 	//don't close fd
 	setState(kDisconnected);
 	channel_ -> disableAll();

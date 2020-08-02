@@ -89,10 +89,9 @@ void TcpServer::newConnection(int sockfd,const InetAddress& peerAddr)
 	LOG_TRACE << " [2] usecount " << conn.use_count();
 	conn -> setConnectionCallback(connectionCallback_);
 	conn -> setMessageCallback(messageCallback_);
-
 	conn -> setCloseCallback(
 		boost::bind(&TcpServer::removeConnection,this,_1));
-
+	conn -> setWriteCompleteCallback(writeCompleteCallback_);
 	ioLoop -> runInLoop(boost::bind(&TcpConnection::connectEstablished,conn));
 
 	LOG_TRACE << " [5] usecount " << conn.use_count();

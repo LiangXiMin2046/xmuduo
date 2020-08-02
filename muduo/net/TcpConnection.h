@@ -46,6 +46,15 @@ public:
 	void send(Buffer* message);
 	void shutdown();
 	void setTcpNoDelay(bool on);
+
+	void setContext(const boost::any& context)
+	{  context_ = context;  }
+
+	const boost::any& getContext() const
+	{  return context_;  }
+
+	boost::any* getMutableContext()
+	{  return &context_;  }
 	
 	void setConnectionCallback(const ConnectionCallback& cb)
 	{  connectionCallback_ = cb;  }
@@ -53,6 +62,16 @@ public:
 	void setMessageCallback(const MessageCallback& cb)
 	{  messageCallback_ = cb;  }
 	
+	void setHighWaterMarkCallback(const HighWaterMarkCallback& cb,size_t highWaterMark)
+	{  highWaterMarkCallback_ = cb;  highWaterMark_ = highWaterMark;  }
+
+	void setWriteCompleteCallback(const WriteCompleteCallback& cb)
+	
+	{  writeCompleteCallback_ = cb;  }
+
+	Buffer* inputBuffer()
+	{  return &inputBuffer_;  }
+
 	//Internal use only
 	void setCloseCallback(const CloseCallback& cb)
 	{  closeCallback_ = cb;  }
@@ -61,8 +80,9 @@ public:
 	//called when TcpServer has removed TcpConnection from map
 	void connectDestroyed();
 private:
-	enum stateE {kDisconnected,kConnecting,kConnected,kDisConnecting};
+	enum stateE {kDisconnected,kConnecting,kConnected,kDisconnecting};
 	void handleRead(Timestamp receiveTime);
+	void handleWrite();
 	void handleClose();
 	void handleError();
 	void sendInLoop(const StringPiece& message);
@@ -79,9 +99,14 @@ private:
 	InetAddress peerAddr_;
 	ConnectionCallback connectionCallback_;
 	MessageCallback messageCallback_;
+	WriteCompleteCallback writeCompleteCallback_;
+
+	HighWaterMarkCallback highWaterMarkCallback_;
 	CloseCallback closeCallback_;
+	size_t highWaterMark_;
 	Buffer inputBuffer_;
 	Buffer outputBuffer_;
+	boost::any context_;
 };
 
 typedef boost::shared_ptr<TcpConnection> TcpConnectionPtr;

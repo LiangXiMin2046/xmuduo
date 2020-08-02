@@ -28,7 +28,7 @@ Timestamp PollPoller::poll(int timeoutMs,ChannelList* activeChannels)
 		LOG_TRACE << numEvents << " events happended ";
 		fillActiveChannels(numEvents,activeChannels);
 	}
-	else if (numEvents = 0)
+	else if (numEvents == 0)
 	{
 		LOG_TRACE << "nothing happended";
 	}
@@ -61,7 +61,7 @@ void PollPoller::fillActiveChannels(int numEvents,ChannelList* activeChannels) c
 void PollPoller::updateChannel(Channel* channel)
 {
 	Poller::assertInLoopThread();
-	LOG_TRACE << "fd = " << channel -> fd() << " events = " << channel -> events();
+	LOG_TRACE << " fd =  " << channel -> fd() << " events =  " << channel -> events();
 	if(channel -> index() < 0)
 	{
 		//new channel,add to pollfds

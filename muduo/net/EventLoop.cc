@@ -4,9 +4,10 @@
 #include "/xmuduo/muduo/net/Channel.h"
 #include "/xmuduo/muduo/net/TimerQueue.h"
 
-//#include <poll.h>
 
 #include <boost/bind.hpp>
+
+#include <signal.h>
 #include <sys/eventfd.h>
 
 using namespace muduo;
@@ -17,7 +18,6 @@ namespace
 __thread EventLoop* t_loopInThisThread = 0;
 
 const int kPollTimeMs = 10000;
-}
 
 int createEventfd()
 {
@@ -28,6 +28,21 @@ int createEventfd()
 		abort();
 	}
 	return evtfd;
+}
+
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+class IgnoreSigPipe
+{
+public:
+	IgnoreSigPipe()
+	{
+		::signal(SIGPIPE,SIG_IGN);
+		LOG_TRACE << "Ignore SIGPIPE";
+	}
+};
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+
+IgnoreSigPipe initObj;
 }
 
 EventLoop* EventLoop::getEventLoopOfCurrentThread()
@@ -71,7 +86,7 @@ void EventLoop::loop()
 	assert(!looping_);
 	assertInLoopThread();
 	looping_ = true;
-	LOG_TRACE << "EventLoop" << this << "start looping";
+	LOG_TRACE << " EventLoop " << this << " start looping";
 
 	//::poll(NULL,0,5*1000);
 	while(!quit_)
@@ -149,7 +164,7 @@ TimerId EventLoop::runEvery(double interval,const TimerCallback& cb)
 
 void EventLoop::cancel(TimerId timerId)
 {
-	return timerQueue_ ->cancel(timerId);
+	return timerQueue_ -> cancel(timerId);
 }
 
 void EventLoop::updateChannel(Channel* channel)
