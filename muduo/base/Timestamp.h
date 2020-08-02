@@ -1,8 +1,8 @@
 #ifndef _MUDUO_BASE_TIMESTAMP_H
 #define _MUDUO_BASE_TIMESTAMP_H
 
-#include "/muduoday/day1/muduo/base/Types.h"
-#include "/muduoday/day1/muduo/base/copyable.h"
+#include "/xmuduo/muduo/base/Types.h"
+#include "/xmuduo/muduo/base/copyable.h"
 
 #include<boost/operators.hpp>
 

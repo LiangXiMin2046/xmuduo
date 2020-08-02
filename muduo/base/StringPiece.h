@@ -5,7 +5,7 @@
 //Author: sanjay Ghemawat
 
 #ifndef MUDUO_BASE_STRINGPIECE_H
-#define MUDUO_BASE_STRINFPIECE_H
+#define MUDUO_BASE_STRINGPIECE_H
 
 #include<string.h>
 #include<iosfwd> //for ostream forward-declaration
