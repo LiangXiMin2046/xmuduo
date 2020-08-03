@@ -218,7 +218,7 @@ struct sockaddr_in sockets::getPeerAddr(int sockfd)
 	struct sockaddr_in peeraddr;
 	bzero(&peeraddr,sizeof peeraddr);
 	socklen_t addrlen = sizeof(peeraddr);
-	if(::getsockname(sockfd,sockaddr_cast(&peeraddr),&addrlen) < 0)
+	if(::getpeername(sockfd,sockaddr_cast(&peeraddr),&addrlen) < 0)
 	{
 		LOG_SYSERR << "sockets::getLocalAddr";
 	}
