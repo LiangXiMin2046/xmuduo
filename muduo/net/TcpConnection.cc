@@ -145,6 +145,7 @@ void TcpConnection::sendInLoop(const void* data,size_t len)
 		if(nwrote >= 0)
 		{
 			remaining = len - nwrote;
+			LOG_TRACE << "len = " << len <<"remaining = "<<remaining;
 			//remainging == 0 means write completly
 			if(remaining == 0 && writeCompleteCallback_)
 			{
