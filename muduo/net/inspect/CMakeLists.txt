@@ -1,0 +1,21 @@
+set(inspect_SRCS
+  Inspector.cc
+  ProcessInspector.cc
+  )
+add_library(muduo_inspect ${inspect_SRCS})
+link_directories(/xmuduo/muduo/net/build)
+target_link_libraries(muduo_inspect muduo_http)
+
+install(TARGETS muduo_inspect DESTINATION lib)
+
+set(HEADERS
+  Inspector.h
+  ProcessInspector.h
+  )
+
+install(FILES ${HEADERS} DESTINATION include/muduo/net/inspect)
+
+if(NOT CMAKE_BUILD_NO_EXAMPLES)
+add_executable(inspector_test tests/Inspector_test.cc)
+target_link_libraries(inspector_test muduo_inspect)
+endif()
